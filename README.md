@@ -30,3 +30,46 @@ await fileStorage.saveStream(fileName, Stream.fromIterable([
   bytes1, bytes2
 ]));
 ```
+
+## DevTools extension
+
+The package ships with a Flutter DevTools extension that lets you explore,
+edit, and delete stored files while debugging. Register the service
+extensions during development to enable the bridge between your app and the
+DevTools UI:
+
+```dart
+import 'package:file_storage/file_storage.dart';
+
+void main() {
+  assert(() {
+    registerFileStorageDevTools();
+    return true;
+  }());
+  runApp(const MyApp());
+}
+```
+
+Make sure your pubspec.yaml contains this:
+
+```yaml
+devtools:
+   extensions:
+      - file_storage
+```
+
+If the devtools extension doesn't show up, make sure that there's a `devtools_options.yaml` file in the root of your project with this content:
+
+```yaml
+extensions:
+  - file_storage: true
+```
+
+Whenever you change the extension UI, rebuild the static assets before
+publishing the package:
+
+```
+dart run devtools_extensions build_and_copy \
+    --source=extension/file_storage_devtools_extension \
+    --dest=extension/devtools
+```

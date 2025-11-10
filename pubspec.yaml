@@ -1,6 +1,6 @@
 name: file_storage
 description: "Cross-platform file storage."
-version: 1.0.0
+version: 1.1.0
 homepage: https://github.com/darkstarx/file_storage
 
 environment:
@@ -20,3 +20,7 @@ dev_dependencies:
     sdk: flutter
 
 flutter: null
+
+devtools_extensions:
+  - name: file_storage
+    path: extension/devtools
