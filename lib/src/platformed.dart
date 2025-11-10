@@ -1,10 +1,7 @@
-import 'unsupported.dart'
-    if (dart.library.html) 'web.dart'
-    if (dart.library.io) 'io.dart';
+import 'storage_entry.dart';
+import 'unsupported.dart' if (dart.library.html) 'web.dart' if (dart.library.io) 'io.dart';
 
-
-abstract interface class FileStorage
-{
+abstract interface class FileStorage {
   /// Creates a platform specific instance of the [FileStorage].
   factory FileStorage() => createFileStorage();
 
@@ -58,7 +55,9 @@ abstract interface class FileStorage
   ///
   /// If [toEncodable] is provided, it's used during serialization the
   /// [jsonValue].
-  Future<void> saveJson(final String fileName, final dynamic jsonValue, {
+  Future<void> saveJson(
+    final String fileName,
+    final dynamic jsonValue, {
     Object? Function(dynamic)? toEncodable,
   });
 
@@ -67,4 +66,12 @@ abstract interface class FileStorage
 
   /// Removes the file with the name [fileName] if exists.
   Future<void> removeFile(final String fileName);
+
+  /// Lists stored files relative to the [area] root.
+  Future<List<FileStorageEntry>> listFiles(
+    final FileStorageArea area, {
+    final String? path,
+    final String? profile,
+    final bool recursive = true,
+  });
 }

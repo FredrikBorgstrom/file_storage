@@ -1,0 +1,6 @@
+name: file_storage
+issueTracker: https://github.com/darkstarx/file_storage/issues
+version: 0.1.0
+materialIconCodePoint: '0xe2c7'
+requiresConnection: true
+

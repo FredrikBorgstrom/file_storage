@@ -1,26 +1,24 @@
-import 'dart:io';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'platformed.dart';
-
+import 'storage_entry.dart';
 
 FileStorage createFileStorage() => FileStorageIO();
 
-
-class FileStorageIO implements FileStorage
-{
+class FileStorageIO implements FileStorage {
   @override
   Future<String> getFilesPath({
     final String? path,
     final String? profile,
     final bool create = false,
-  }) async
-  {
+  }) async {
     _filesRootDir ??= await getApplicationSupportDirectory();
-    return await _buildPath(_filesRootDir!.path,
+    return await _buildPath(
+      _filesRootDir!.path,
       path: path,
       profile: profile,
       create: create,
@@ -32,10 +30,10 @@ class FileStorageIO implements FileStorage
     final String? path,
     final String? profile,
     final bool create = false,
-  }) async
-  {
+  }) async {
     _docsRootDir ??= await getApplicationDocumentsDirectory();
-    return await _buildPath(_docsRootDir!.path,
+    return await _buildPath(
+      _docsRootDir!.path,
       path: path,
       profile: profile,
       create: create,
@@ -47,10 +45,10 @@ class FileStorageIO implements FileStorage
     final String? path,
     final String? profile,
     final bool create = false,
-  }) async
-  {
+  }) async {
     _cacheRootDir ??= await getTemporaryDirectory();
-    return await _buildPath(_cacheRootDir!.path,
+    return await _buildPath(
+      _cacheRootDir!.path,
       path: path,
       profile: profile,
       create: create,
@@ -58,21 +56,18 @@ class FileStorageIO implements FileStorage
   }
 
   @override
-  Future<void> ensurePathExists(final String fileName) async
-  {
+  Future<void> ensurePathExists(final String fileName) async {
     await Directory(dirname(fileName)).create(recursive: true);
   }
 
   @override
-  Future<bool> fileExists(final String fileName)
-  {
+  Future<bool> fileExists(final String fileName) {
     final file = File(fileName);
     return file.exists();
   }
 
   @override
-  Future<List<int>?> loadData(final String fileName) async
-  {
+  Future<List<int>?> loadData(final String fileName) async {
     final file = File(fileName);
     final fileExists = await file.exists();
     if (!fileExists) {
@@ -82,8 +77,7 @@ class FileStorageIO implements FileStorage
   }
 
   @override
-  Future<String?> loadText(final String fileName) async
-  {
+  Future<String?> loadText(final String fileName) async {
     final file = File(fileName);
     final fileExists = await file.exists();
     if (!fileExists) {
@@ -93,8 +87,7 @@ class FileStorageIO implements FileStorage
   }
 
   @override
-  Future<Object?> loadJson(final String fileName) async
-  {
+  Future<Object?> loadJson(final String fileName) async {
     final file = File(fileName);
     final fileExists = await file.exists();
     if (!fileExists) {
@@ -104,37 +97,31 @@ class FileStorageIO implements FileStorage
     if (size <= 0) {
       return null;
     }
-    final objects = await file.openRead()
-      .transform(utf8.decoder)
-      .transform(json.decoder)
-      .toList();
+    final objects = await file.openRead().transform(utf8.decoder).transform(json.decoder).toList();
     return objects.isEmpty ? null : objects.first;
   }
 
   @override
-  Future<void> saveData(final String fileName, final List<int> data) async
-  {
+  Future<void> saveData(final String fileName, final List<int> data) async {
     final file = File(fileName);
     await file.writeAsBytes(data, flush: true);
   }
 
   @override
-  Future<void> saveText(final String fileName, final String text) async
-  {
+  Future<void> saveText(final String fileName, final String text) async {
     final file = File(fileName);
     await file.writeAsString(text, flush: true);
   }
 
   @override
-  Future<void> saveJson(final String fileName, final dynamic jsonValue, {
+  Future<void> saveJson(
+    final String fileName,
+    final dynamic jsonValue, {
     Object? Function(dynamic)? toEncodable,
-  }) async
-  {
+  }) async {
     final file = File(fileName);
     final sink = file.openWrite();
-    final stream = Stream.value(jsonValue)
-      .transform(JsonEncoder(toEncodable))
-      .transform(const Utf8Encoder());
+    final stream = Stream.value(jsonValue).transform(JsonEncoder(toEncodable)).transform(const Utf8Encoder());
     await sink.addStream(stream);
     await sink.flush();
     await sink.close();
@@ -144,8 +131,7 @@ class FileStorageIO implements FileStorage
   Future<void> saveStream(
     final String fileName,
     final Stream<List<int>> stream,
-  ) async
-  {
+  ) async {
     final file = File(fileName);
     final sink = file.openWrite();
     await sink.addStream(stream);
@@ -154,20 +140,36 @@ class FileStorageIO implements FileStorage
   }
 
   @override
-  Future<void> removeFile(final String fileName) async
-  {
+  Future<void> removeFile(final String fileName) async {
     final file = File(fileName);
     final fileExists = await file.exists();
     if (!fileExists) return;
     await file.delete(recursive: true);
   }
 
-  Future<String> _buildPath(final String basePath, {
+  @override
+  Future<List<FileStorageEntry>> listFiles(
+    final FileStorageArea area, {
+    final String? path,
+    final String? profile,
+    final bool recursive = true,
+  }) async {
+    final root = await _resolveRootPath(area);
+    final target = await _buildPath(
+      root,
+      path: path,
+      profile: profile,
+      create: false,
+    );
+    return await _collectEntries(target, recursive);
+  }
+
+  Future<String> _buildPath(
+    final String basePath, {
     final String? path,
     final String? profile,
     final bool create = false,
-  }) async
-  {
+  }) async {
     var fullPath = basePath;
     if (profile != null && profile.isNotEmpty) {
       fullPath += '/$profile';
@@ -184,4 +186,54 @@ class FileStorageIO implements FileStorage
   Directory? _filesRootDir;
   Directory? _docsRootDir;
   Directory? _cacheRootDir;
+
+  Future<String> _resolveRootPath(final FileStorageArea area) async {
+    switch (area) {
+      case FileStorageArea.files:
+        _filesRootDir ??= await getApplicationSupportDirectory();
+        return _filesRootDir!.path;
+      case FileStorageArea.documents:
+        _docsRootDir ??= await getApplicationDocumentsDirectory();
+        return _docsRootDir!.path;
+      case FileStorageArea.cache:
+        _cacheRootDir ??= await getTemporaryDirectory();
+        return _cacheRootDir!.path;
+    }
+  }
+
+  Future<List<FileStorageEntry>> _collectEntries(
+    final String root,
+    final bool recursive,
+  ) async {
+    final directory = Directory(root);
+    if (!await directory.exists()) return <FileStorageEntry>[];
+    final files = await _listFiles(directory, recursive);
+    final entries = await Future.wait(files.map((file) => _buildEntry(root, file)));
+    entries.sort((a, b) => a.path.compareTo(b.path));
+    return entries;
+  }
+
+  Future<List<File>> _listFiles(
+    final Directory directory,
+    final bool recursive,
+  ) async {
+    final files = <File>[];
+    await for (final entity in directory.list(recursive: recursive, followLinks: false)) {
+      if (entity is File) files.add(entity);
+    }
+    return files;
+  }
+
+  Future<FileStorageEntry> _buildEntry(
+    final String root,
+    final File file,
+  ) async {
+    final stat = await file.stat();
+    final relativePath = relative(file.path, from: root);
+    return FileStorageEntry(
+      path: relativePath,
+      byteLength: stat.size,
+      lastModified: stat.modified.toUtc(),
+    );
+  }
 }
