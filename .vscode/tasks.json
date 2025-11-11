@@ -1,0 +1,13 @@
+{
+	// See https://go.microsoft.com/fwlink/?LinkId=733558
+	// for the documentation about the tasks.json format
+	"version": "2.0.0",
+	"tasks": [
+      {
+        "label": "build devtools extension",
+        "type": "shell",
+        "command": "cd extension/file_storage_devtools_extension && flutter pub get && dart run devtools_extensions build_and_copy --source=. --dest=../devtools",
+
+      }
+    ]
+  }
