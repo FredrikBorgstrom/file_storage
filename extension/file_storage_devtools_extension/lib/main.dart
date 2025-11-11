@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:web/web.dart' as web;
+
 import 'package:devtools_app_shared/service.dart';
 import 'package:devtools_app_shared/ui.dart';
 import 'package:devtools_extensions/devtools_extensions.dart';
@@ -29,6 +31,7 @@ class FileStorageHome extends StatefulWidget {
 
 class _FileStorageHomeState extends State<FileStorageHome> {
   static const int _maxTextPreviewBytes = 4 * 1024 * 1024;
+  static const String _pathPrefixStorageKey = 'file_storage_path_prefix';
 
   final _api = _FileStorageApi();
   final _profileController = TextEditingController();
@@ -54,7 +57,9 @@ class _FileStorageHomeState extends State<FileStorageHome> {
   @override
   void initState() {
     super.initState();
+    _restorePathPrefix();
     _editorController.addListener(_handleEditorChange);
+    _pathController.addListener(_persistPathPrefix);
     _wasConnected = _isConnected;
     serviceManager.connectedState.addListener(_handleConnectionChange);
     if (_wasConnected) {
@@ -66,6 +71,7 @@ class _FileStorageHomeState extends State<FileStorageHome> {
   void dispose() {
     serviceManager.connectedState.removeListener(_handleConnectionChange);
     _profileController.dispose();
+    _pathController.removeListener(_persistPathPrefix);
     _pathController.dispose();
     _editorController.dispose();
     super.dispose();
@@ -167,6 +173,23 @@ class _FileStorageHomeState extends State<FileStorageHome> {
       _recursive = value;
     });
     _refreshFiles();
+  }
+
+  void _restorePathPrefix() {
+    final storage = web.window.localStorage;
+    final storedValue = storage.getItem(_pathPrefixStorageKey);
+    if (storedValue == null) return;
+    _pathController.text = storedValue;
+  }
+
+  void _persistPathPrefix() {
+    final storage = web.window.localStorage;
+    final value = _pathController.text;
+    if (value.isEmpty) {
+      storage.removeItem(_pathPrefixStorageKey);
+      return;
+    }
+    storage.setItem(_pathPrefixStorageKey, value);
   }
 
   Future<void> _refreshFiles() async {
