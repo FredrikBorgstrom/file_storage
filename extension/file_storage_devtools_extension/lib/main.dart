@@ -7,59 +7,48 @@ import 'package:devtools_app_shared/ui.dart';
 import 'package:devtools_extensions/devtools_extensions.dart';
 import 'package:flutter/material.dart';
 
-void main() {
+
+void main()
+{
   runApp(const FileStorageDevToolsApp());
 }
 
-class FileStorageDevToolsApp extends StatelessWidget {
-  const FileStorageDevToolsApp({super.key});
+
+class FileStorageDevToolsApp extends StatelessWidget
+{
+  const FileStorageDevToolsApp({ super.key });
 
   @override
-  Widget build(final BuildContext context) {
+  Widget build(final BuildContext context)
+  {
     return const DevToolsExtension(
       child: FileStorageHome(),
     );
   }
 }
 
-class FileStorageHome extends StatefulWidget {
-  const FileStorageHome({super.key});
+
+class FileStorageHome extends StatefulWidget
+{
+  const FileStorageHome({ super.key });
 
   @override
   State<FileStorageHome> createState() => _FileStorageHomeState();
 }
 
-class _FileStorageHomeState extends State<FileStorageHome> {
-  static const int _maxTextPreviewBytes = 4 * 1024 * 1024;
-  static const String _pathPrefixStorageKey = 'file_storage_path_prefix';
-
-  final _api = _FileStorageApi();
-  final _profileController = TextEditingController();
-  final _pathController = TextEditingController();
-  final _editorController = TextEditingController();
-  _StorageOption _selectedArea = _storageOptions.first;
-  var _recursive = true;
-  var _files = <_FileEntry>[];
-  _FileEntry? _selectedEntry;
-  _FilePayload? _payload;
-  var _listLoading = false;
-  var _fileLoading = false;
-  var _savingFile = false;
-  var _dirty = false;
-  String? _listError;
-  String? _fileError;
-  var _wasConnected = false;
-  var _updatingEditor = false;
-  var _textTooLarge = false;
-
-  bool get _isConnected => serviceManager.connectedState.value.connected;
-
+class _FileStorageHomeState extends State<FileStorageHome>
+{
   @override
-  void initState() {
+  void initState()
+  {
     super.initState();
+    _profileController = TextEditingController();
+    _pathController = TextEditingController()
+      ..addListener(_persistPathPrefix);
+    _editorController = TextEditingController()
+      ..addListener(_handleEditorChange);
+
     _restorePathPrefix();
-    _editorController.addListener(_handleEditorChange);
-    _pathController.addListener(_persistPathPrefix);
     _wasConnected = _isConnected;
     serviceManager.connectedState.addListener(_handleConnectionChange);
     if (_wasConnected) {
@@ -68,17 +57,18 @@ class _FileStorageHomeState extends State<FileStorageHome> {
   }
 
   @override
-  void dispose() {
+  void dispose()
+  {
     serviceManager.connectedState.removeListener(_handleConnectionChange);
     _profileController.dispose();
-    _pathController.removeListener(_persistPathPrefix);
     _pathController.dispose();
     _editorController.dispose();
     super.dispose();
   }
 
   @override
-  Widget build(final BuildContext context) {
+  Widget build(final BuildContext context)
+  {
     return ValueListenableBuilder<ConnectedState>(
       valueListenable: serviceManager.connectedState,
       builder: (context, state, _) {
@@ -142,7 +132,8 @@ class _FileStorageHomeState extends State<FileStorageHome> {
     );
   }
 
-  void _handleConnectionChange() {
+  void _handleConnectionChange()
+  {
     final connected = _isConnected;
     if (connected && !_wasConnected) {
       _wasConnected = true;
@@ -154,35 +145,40 @@ class _FileStorageHomeState extends State<FileStorageHome> {
     }
   }
 
-  void _handleEditorChange() {
+  void _handleEditorChange()
+  {
     if (_updatingEditor || _payload == null || !_payload!.isText) return;
     setState(() {
       _dirty = true;
     });
   }
 
-  void _changeArea(final _StorageOption option) {
+  void _changeArea(final _StorageOption option)
+  {
     setState(() {
       _selectedArea = option;
     });
     _refreshFiles();
   }
 
-  void _changeRecursive(final bool value) {
+  void _changeRecursive(final bool value)
+  {
     setState(() {
       _recursive = value;
     });
     _refreshFiles();
   }
 
-  void _restorePathPrefix() {
+  void _restorePathPrefix()
+  {
     final storage = web.window.localStorage;
     final storedValue = storage.getItem(_pathPrefixStorageKey);
     if (storedValue == null) return;
     _pathController.text = storedValue;
   }
 
-  void _persistPathPrefix() {
+  void _persistPathPrefix()
+  {
     final storage = web.window.localStorage;
     final value = _pathController.text;
     if (value.isEmpty) {
@@ -192,7 +188,8 @@ class _FileStorageHomeState extends State<FileStorageHome> {
     storage.setItem(_pathPrefixStorageKey, value);
   }
 
-  Future<void> _refreshFiles() async {
+  Future<void> _refreshFiles() async
+  {
     if (!_isConnected) return;
     _startListLoading();
     try {
@@ -205,14 +202,16 @@ class _FileStorageHomeState extends State<FileStorageHome> {
     }
   }
 
-  void _startListLoading() {
+  void _startListLoading()
+  {
     setState(() {
       _listLoading = true;
       _listError = null;
     });
   }
 
-  Future<List<_FileEntry>> _fetchFiles() {
+  Future<List<_FileEntry>> _fetchFiles()
+  {
     return _api.listFiles(
       area: _selectedArea.area,
       profile: _profileText(),
@@ -221,10 +220,12 @@ class _FileStorageHomeState extends State<FileStorageHome> {
     );
   }
 
-  void _handleListSuccess(final List<_FileEntry> files) {
+  void _handleListSuccess(final List<_FileEntry> files)
+  {
     final previousPath = _selectedEntry?.path;
-    final nextSelected =
-        previousPath == null ? null : _findByPath(files, previousPath);
+    final nextSelected = previousPath == null
+      ? null
+      : _findByPath(files, previousPath);
     setState(() {
       _files = files;
       _selectedEntry = nextSelected;
@@ -236,20 +237,23 @@ class _FileStorageHomeState extends State<FileStorageHome> {
     });
   }
 
-  void _handleListError(final Object error, final StackTrace stackTrace) {
+  void _handleListError(final Object error, final StackTrace stackTrace)
+  {
     debugPrint('Failed to load files: $error\n$stackTrace');
     setState(() {
       _listError = error.toString();
     });
   }
 
-  void _finishListLoading() {
+  void _finishListLoading()
+  {
     setState(() {
       _listLoading = false;
     });
   }
 
-  Future<void> _openFile(final _FileEntry entry) async {
+  Future<void> _openFile(final _FileEntry entry) async
+  {
     if (_shouldSkipOpen(entry)) return;
     _startFileLoading(entry);
     try {
@@ -258,9 +262,9 @@ class _FileStorageHomeState extends State<FileStorageHome> {
         profile: _profileText(),
         path: entry.path,
       );
-      final tooLargeForText = entry.byteLength != null &&
-          entry.byteLength! > _maxTextPreviewBytes &&
-          payload.isTextFile;
+      final tooLargeForText = entry.byteLength != null
+        && entry.byteLength! > _maxTextPreviewBytes
+        && payload.isTextFile;
       if (tooLargeForText) {
         payload = _FilePayload(
           base64: payload.base64,
@@ -276,13 +280,15 @@ class _FileStorageHomeState extends State<FileStorageHome> {
     }
   }
 
-  Future<void> _reloadSelected() async {
+  Future<void> _reloadSelected() async
+  {
     final entry = _selectedEntry;
     if (entry == null) return;
     await _openFile(entry);
   }
 
-  Future<void> _saveSelected() async {
+  Future<void> _saveSelected() async
+  {
     final entry = _selectedEntry;
     final payload = _payload;
     if (entry == null || payload == null || !payload.isText || !_dirty) return;
@@ -305,7 +311,8 @@ class _FileStorageHomeState extends State<FileStorageHome> {
     }
   }
 
-  Future<void> _deleteSelected() async {
+  Future<void> _deleteSelected() async
+  {
     final entry = _selectedEntry;
     if (entry == null) return;
     _startSaving();
@@ -324,7 +331,8 @@ class _FileStorageHomeState extends State<FileStorageHome> {
     }
   }
 
-  void _deleteFromList(final _FileEntry entry) {
+  void _deleteFromList(final _FileEntry entry)
+  {
     setState(() {
       _files = _files.where((item) => item.path != entry.path).toList();
       if (_selectedEntry?.path == entry.path) {
@@ -337,10 +345,10 @@ class _FileStorageHomeState extends State<FileStorageHome> {
     });
   }
 
-  void _applyPayload(
-    final _FilePayload payload, {
+  void _applyPayload(final _FilePayload payload, {
     final bool textTooLarge = false,
-  }) {
+  })
+  {
     _updatingEditor = true;
     if (payload.isText) {
       _editorController.text = payload.text ?? '';
@@ -356,11 +364,13 @@ class _FileStorageHomeState extends State<FileStorageHome> {
     _updatingEditor = false;
   }
 
-  bool _shouldSkipOpen(final _FileEntry entry) {
+  bool _shouldSkipOpen(final _FileEntry entry)
+  {
     return _selectedEntry?.path == entry.path && _payload != null && !_dirty;
   }
 
-  void _startFileLoading(final _FileEntry entry) {
+  void _startFileLoading(final _FileEntry entry)
+  {
     setState(() {
       _selectedEntry = entry;
       _fileLoading = true;
@@ -370,7 +380,8 @@ class _FileStorageHomeState extends State<FileStorageHome> {
     });
   }
 
-  void _handleFileError(final Object error, final StackTrace stackTrace) {
+  void _handleFileError(final Object error, final StackTrace stackTrace)
+  {
     debugPrint('Failed to load file: $error\n$stackTrace');
     setState(() {
       _fileError = error.toString();
@@ -381,39 +392,45 @@ class _FileStorageHomeState extends State<FileStorageHome> {
     });
   }
 
-  void _finishFileLoading() {
+  void _finishFileLoading()
+  {
     setState(() {
       _fileLoading = false;
     });
   }
 
-  void _startSaving() {
+  void _startSaving()
+  {
     setState(() {
       _savingFile = true;
       _fileError = null;
     });
   }
 
-  void _markClean() {
+  void _markClean()
+  {
     setState(() {
       _dirty = false;
     });
   }
 
-  void _handleSaveError(final Object error, final StackTrace stackTrace) {
+  void _handleSaveError(final Object error, final StackTrace stackTrace)
+  {
     debugPrint('File operation failed: $error\n$stackTrace');
     setState(() {
       _fileError = error.toString();
     });
   }
 
-  void _finishSaving() {
+  void _finishSaving()
+  {
     setState(() {
       _savingFile = false;
     });
   }
 
-  void _clearState() {
+  void _clearState()
+  {
     setState(() {
       _files = const [];
       _selectedEntry = null;
@@ -429,34 +446,62 @@ class _FileStorageHomeState extends State<FileStorageHome> {
     _editorController.clear();
   }
 
-  String? _profileText() {
+  String? _profileText()
+  {
     final text = _profileController.text.trim();
     return text.isEmpty ? null : text;
   }
 
-  String? _pathText() {
+  String? _pathText()
+  {
     final text = _pathController.text.trim();
     return text.isEmpty ? null : text;
   }
 
-  _FileEntry? _findByPath(
-    final List<_FileEntry> files,
-    final String path,
-  ) {
+  _FileEntry? _findByPath(final List<_FileEntry> files, final String path)
+  {
     for (final entry in files) {
       if (entry.path == path) return entry;
     }
     return null;
   }
+
+  bool get _isConnected => serviceManager.connectedState.value.connected;
+
+  late final TextEditingController _profileController;
+  late final TextEditingController _pathController;
+  late final TextEditingController _editorController;
+
+  final _api = _FileStorageApi();
+  _StorageOption _selectedArea = _storageOptions.first;
+  var _recursive = true;
+  var _files = <_FileEntry>[];
+  _FileEntry? _selectedEntry;
+  _FilePayload? _payload;
+  var _listLoading = false;
+  var _fileLoading = false;
+  var _savingFile = false;
+  var _dirty = false;
+  String? _listError;
+  String? _fileError;
+  var _wasConnected = false;
+  var _updatingEditor = false;
+  var _textTooLarge = false;
+
+  static const int _maxTextPreviewBytes = 4 * 1024 * 1024;
+  static const String _pathPrefixStorageKey = 'file_storage_path_prefix';
 }
 
-class _DisconnectedNotice extends StatelessWidget {
-  const _DisconnectedNotice({required this.onRetry});
 
+class _DisconnectedNotice extends StatelessWidget
+{
   final VoidCallback onRetry;
 
+  const _DisconnectedNotice({ required this.onRetry });
+
   @override
-  Widget build(final BuildContext context) {
+  Widget build(final BuildContext context)
+  {
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -475,7 +520,19 @@ class _DisconnectedNotice extends StatelessWidget {
   }
 }
 
-class _FileStorageToolbar extends StatelessWidget {
+
+class _FileStorageToolbar extends StatelessWidget
+{
+  final List<_StorageOption> options;
+  final _StorageOption selected;
+  final TextEditingController profileController;
+  final TextEditingController pathController;
+  final bool recursive;
+  final bool refreshing;
+  final ValueChanged<_StorageOption> onAreaChanged;
+  final ValueChanged<bool> onRecursiveChanged;
+  final VoidCallback onRefresh;
+
   const _FileStorageToolbar({
     required this.options,
     required this.selected,
@@ -488,18 +545,9 @@ class _FileStorageToolbar extends StatelessWidget {
     required this.onRefresh,
   });
 
-  final List<_StorageOption> options;
-  final _StorageOption selected;
-  final TextEditingController profileController;
-  final TextEditingController pathController;
-  final bool recursive;
-  final bool refreshing;
-  final ValueChanged<_StorageOption> onAreaChanged;
-  final ValueChanged<bool> onRecursiveChanged;
-  final VoidCallback onRefresh;
-
   @override
-  Widget build(final BuildContext context) {
+  Widget build(final BuildContext context)
+  {
     return Wrap(
       spacing: denseSpacing,
       runSpacing: denseSpacing,
@@ -557,12 +605,21 @@ class _FileStorageToolbar extends StatelessWidget {
     );
   }
 
-  void _notifyAreaChanged(final _StorageOption? option) {
+  void _notifyAreaChanged(final _StorageOption? option)
+  {
     if (option != null) onAreaChanged(option);
   }
 }
 
-class _FileListView extends StatelessWidget {
+
+class _FileListView extends StatelessWidget
+{
+  final List<_FileEntry> files;
+  final _FileEntry? selected;
+  final bool loading;
+  final String? error;
+  final ValueChanged<_FileEntry> onSelect;
+
   const _FileListView({
     required this.files,
     required this.selected,
@@ -571,14 +628,9 @@ class _FileListView extends StatelessWidget {
     required this.onSelect,
   });
 
-  final List<_FileEntry> files;
-  final _FileEntry? selected;
-  final bool loading;
-  final String? error;
-  final ValueChanged<_FileEntry> onSelect;
-
   @override
-  Widget build(final BuildContext context) {
+  Widget build(final BuildContext context)
+  {
     if (loading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -607,7 +659,21 @@ class _FileListView extends StatelessWidget {
   }
 }
 
-class _FileDetailView extends StatelessWidget {
+
+class _FileDetailView extends StatelessWidget
+{
+  final _FileEntry? entry;
+  final _FilePayload? payload;
+  final TextEditingController controller;
+  final bool dirty;
+  final bool loading;
+  final bool saving;
+  final String? error;
+  final VoidCallback onReload;
+  final VoidCallback? onSave;
+  final VoidCallback onDelete;
+  final bool textTooLarge;
+
   const _FileDetailView({
     required this.entry,
     required this.payload,
@@ -622,20 +688,9 @@ class _FileDetailView extends StatelessWidget {
     required this.textTooLarge,
   });
 
-  final _FileEntry? entry;
-  final _FilePayload? payload;
-  final TextEditingController controller;
-  final bool dirty;
-  final bool loading;
-  final bool saving;
-  final String? error;
-  final VoidCallback onReload;
-  final VoidCallback? onSave;
-  final VoidCallback onDelete;
-  final bool textTooLarge;
-
   @override
-  Widget build(final BuildContext context) {
+  Widget build(final BuildContext context)
+  {
     if (entry == null) {
       return const Center(child: Text('Select a file to inspect.'));
     }
@@ -678,7 +733,16 @@ class _FileDetailView extends StatelessWidget {
   }
 }
 
-class _DetailsHeader extends StatelessWidget {
+
+class _DetailsHeader extends StatelessWidget
+{
+  final _FileEntry entry;
+  final bool dirty;
+  final bool saving;
+  final VoidCallback onReload;
+  final VoidCallback? onSave;
+  final VoidCallback onDelete;
+
   const _DetailsHeader({
     required this.entry,
     required this.dirty,
@@ -688,15 +752,9 @@ class _DetailsHeader extends StatelessWidget {
     required this.onDelete,
   });
 
-  final _FileEntry entry;
-  final bool dirty;
-  final bool saving;
-  final VoidCallback onReload;
-  final VoidCallback? onSave;
-  final VoidCallback onDelete;
-
   @override
-  Widget build(final BuildContext context) {
+  Widget build(final BuildContext context)
+  {
     final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -742,13 +800,16 @@ class _DetailsHeader extends StatelessWidget {
   }
 }
 
-class _EditableTextField extends StatelessWidget {
-  const _EditableTextField({required this.controller});
 
+class _EditableTextField extends StatelessWidget
+{
   final TextEditingController controller;
 
+  const _EditableTextField({ required this.controller });
+
   @override
-  Widget build(final BuildContext context) {
+  Widget build(final BuildContext context)
+  {
     return TextField(
       controller: controller,
       maxLines: null,
@@ -763,13 +824,16 @@ class _EditableTextField extends StatelessWidget {
   }
 }
 
-class _BinaryPreview extends StatelessWidget {
-  const _BinaryPreview({required this.payload});
 
+class _BinaryPreview extends StatelessWidget
+{
   final _FilePayload payload;
 
+  const _BinaryPreview({ required this.payload });
+
   @override
-  Widget build(final BuildContext context) {
+  Widget build(final BuildContext context)
+  {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -786,11 +850,14 @@ class _BinaryPreview extends StatelessWidget {
   }
 }
 
-class _LargeTextNotice extends StatelessWidget {
+
+class _LargeTextNotice extends StatelessWidget
+{
   const _LargeTextNotice();
 
   @override
-  Widget build(final BuildContext context) {
+  Widget build(final BuildContext context)
+  {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(defaultSpacing),
@@ -804,13 +871,16 @@ class _LargeTextNotice extends StatelessWidget {
   }
 }
 
-class _ErrorState extends StatelessWidget {
-  const _ErrorState({required this.message});
 
+class _ErrorState extends StatelessWidget
+{
   final String message;
 
+  const _ErrorState({ required this.message });
+
   @override
-  Widget build(final BuildContext context) {
+  Widget build(final BuildContext context)
+  {
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -824,13 +894,16 @@ class _ErrorState extends StatelessWidget {
   }
 }
 
-class _ErrorBanner extends StatelessWidget {
-  const _ErrorBanner({required this.message});
 
+class _ErrorBanner extends StatelessWidget
+{
   final String message;
 
+  const _ErrorBanner({ required this.message });
+
   @override
-  Widget build(final BuildContext context) {
+  Widget build(final BuildContext context)
+  {
     return Container(
       padding: const EdgeInsets.all(denseSpacing),
       decoration: BoxDecoration(
@@ -847,11 +920,13 @@ class _ErrorBanner extends StatelessWidget {
   }
 }
 
-class _StorageOption {
-  const _StorageOption(this.label, this.area);
 
+class _StorageOption
+{
   final String label;
   final String area;
+
+  const _StorageOption(this.label, this.area);
 }
 
 const _storageOptions = [
@@ -860,14 +935,21 @@ const _storageOptions = [
   _StorageOption('Cache', 'cache'),
 ];
 
-class _FileEntry {
+
+class _FileEntry
+{
+  final String path;
+  final int? byteLength;
+  final DateTime? lastModified;
+
   _FileEntry({
     required this.path,
     this.byteLength,
     this.lastModified,
   });
 
-  factory _FileEntry.fromJson(final Map<String, Object?> json) {
+  factory _FileEntry.fromJson(final Map<String, Object?> json)
+  {
     final modified = json['lastModified'] as String?;
     return _FileEntry(
       path: json['path'] as String,
@@ -876,34 +958,35 @@ class _FileEntry {
     );
   }
 
-  final String path;
-  final int? byteLength;
-  final DateTime? lastModified;
-
-  String get description {
+  String get description
+  {
     final size = _formatFileSize(byteLength);
     final timestamp = lastModified == null
-        ? 'unknown'
-        : lastModified!.toLocal().toIso8601String();
+      ? 'unknown'
+      : lastModified!.toLocal().toIso8601String();
     return 'Size: $size • Modified: $timestamp';
   }
 }
 
-class _FilePayload {
-  const _FilePayload({
-    required this.base64,
-    this.text,
-    this.isTextFile = false,
-  });
 
+class _FilePayload
+{
   final String base64;
   final String? text;
   final bool isTextFile;
 
   bool get isText => isTextFile && text != null;
+
+  const _FilePayload({
+    required this.base64,
+    this.text,
+    this.isTextFile = false,
+  });
 }
 
-String _formatFileSize(final int? bytes) {
+
+String _formatFileSize(final int? bytes)
+{
   if (bytes == null) return 'unknown';
   if (bytes < 1024) return '$bytes B';
   final kb = bytes / 1024;
@@ -912,13 +995,16 @@ String _formatFileSize(final int? bytes) {
   return '${mb.toStringAsFixed(mb >= 100 ? 0 : 1)} MB';
 }
 
-class _FileStorageApi {
+
+class _FileStorageApi
+{
   Future<List<_FileEntry>> listFiles({
     required final String area,
     final String? profile,
     final String? path,
     final bool recursive = true,
-  }) async {
+  }) async
+  {
     final response = await serviceManager.callServiceExtensionOnMainIsolate(
       'ext.file_storage.listFiles',
       args: _buildArgs(
@@ -930,16 +1016,17 @@ class _FileStorageApi {
     );
     final data = response.json?['files'] as List<dynamic>? ?? const [];
     return data
-        .whereType<Map<String, Object?>>()
-        .map(_FileEntry.fromJson)
-        .toList();
+      .whereType<Map<String, Object?>>()
+      .map(_FileEntry.fromJson)
+      .toList();
   }
 
   Future<_FilePayload> readFile({
     required final String area,
     final String? profile,
     required final String path,
-  }) async {
+  }) async
+  {
     final response = await serviceManager.callServiceExtensionOnMainIsolate(
       'ext.file_storage.readFile',
       args: _buildArgs(
@@ -966,7 +1053,8 @@ class _FileStorageApi {
     required final String path,
     required final String text,
     required final bool isText,
-  }) async {
+  }) async
+  {
     final args = _buildArgs(
       area: area,
       profile: profile,
@@ -989,7 +1077,8 @@ class _FileStorageApi {
     required final String area,
     final String? profile,
     required final String path,
-  }) async {
+  }) async
+  {
     await serviceManager.callServiceExtensionOnMainIsolate(
       'ext.file_storage.deleteFile',
       args: _buildArgs(
@@ -1000,18 +1089,15 @@ class _FileStorageApi {
     );
   }
 
-  Map<String, Object?> _buildArgs({
+  Map<String, dynamic> _buildArgs({
     required final String area,
     final String? profile,
     final String? path,
     final bool? recursive,
-  }) {
-    final args = <String, Object?>{
-      'area': area,
-    };
-    if (profile != null) args['profile'] = profile;
-    if (path != null) args['path'] = path;
-    if (recursive != null) args['recursive'] = '$recursive';
-    return args;
-  }
+  }) => {
+    'area': area,
+    if (profile != null) 'profile': profile,
+    if (path != null) 'path': path,
+    if (recursive != null) 'recursive': '$recursive',
+  };
 }
