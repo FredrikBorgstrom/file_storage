@@ -27,6 +27,7 @@ class _FileStorageDevTools {
 
   void _registerHandlers() {
     _register('listFiles', _handleListFiles);
+    _register('listFolders', _handleListFolders);
     _register('readFile', _handleReadFile);
     _register('saveFile', _handleSaveFile);
     _register('deleteFile', _handleDeleteFile);
@@ -84,6 +85,40 @@ class _FileStorageDevTools {
     final recursive = parameters['recursive'] != 'false';
     final files = await _fetchEntries(request, recursive);
     return {'files': files};
+  }
+
+  Future<Map<String, Object?>> _handleListFolders(
+    final Map<String, String> parameters,
+  ) async {
+    final area = _parseArea(parameters['area']);
+    final profile = _clean(parameters['profile']);
+    final folders = await _fetchTopLevelFolders(area, profile);
+    return {'folders': folders};
+  }
+
+  Future<List<String>> _fetchTopLevelFolders(
+    final FileStorageArea area,
+    final String? profile,
+  ) async {
+    // Get all files at root level (non-recursive to be faster)
+    final entries = await _storage!.listFiles(
+      area,
+      profile: profile,
+      recursive: true,
+    );
+
+    // Extract unique top-level folder names from paths
+    final folders = <String>{};
+    for (final entry in entries) {
+      final path = entry.path;
+      final slashIndex = path.indexOf('/');
+      if (slashIndex > 0) {
+        folders.add(path.substring(0, slashIndex));
+      }
+    }
+
+    final sortedFolders = folders.toList()..sort();
+    return sortedFolders;
   }
 
   Future<Map<String, Object?>> _handleReadFile(
