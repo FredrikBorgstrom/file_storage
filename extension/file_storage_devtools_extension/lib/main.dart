@@ -43,8 +43,6 @@ class _FileStorageHomeState extends State<FileStorageHome>
   {
     super.initState();
     _profileController = TextEditingController();
-    _pathController = TextEditingController()
-      ..addListener(_persistPathPrefix);
     _editorController = TextEditingController()
       ..addListener(_handleEditorChange);
 
@@ -52,7 +50,7 @@ class _FileStorageHomeState extends State<FileStorageHome>
     _wasConnected = _isConnected;
     serviceManager.connectedState.addListener(_handleConnectionChange);
     if (_wasConnected) {
-      scheduleMicrotask(_refreshFiles);
+      scheduleMicrotask(_refreshAll);
     }
   }
 
@@ -61,7 +59,6 @@ class _FileStorageHomeState extends State<FileStorageHome>
   {
     serviceManager.connectedState.removeListener(_handleConnectionChange);
     _profileController.dispose();
-    _pathController.dispose();
     _editorController.dispose();
     super.dispose();
   }
@@ -73,7 +70,7 @@ class _FileStorageHomeState extends State<FileStorageHome>
       valueListenable: serviceManager.connectedState,
       builder: (context, state, _) {
         if (!state.connected) {
-          return _DisconnectedNotice(onRetry: _refreshFiles);
+          return _DisconnectedNotice(onRetry: _refreshAll);
         }
         return Padding(
           padding: const EdgeInsets.all(defaultSpacing),
@@ -84,12 +81,15 @@ class _FileStorageHomeState extends State<FileStorageHome>
                 options: _storageOptions,
                 selected: _selectedArea,
                 profileController: _profileController,
-                pathController: _pathController,
+                folders: _folders,
+                selectedFolder: _selectedFolder,
+                foldersLoading: _foldersLoading,
                 recursive: _recursive,
                 refreshing: _listLoading,
                 onAreaChanged: _changeArea,
+                onFolderChanged: _changeFolder,
                 onRecursiveChanged: _changeRecursive,
-                onRefresh: _refreshFiles,
+                onRefresh: _refreshAll,
               ),
               const SizedBox(height: denseSpacing),
               Expanded(
@@ -137,7 +137,7 @@ class _FileStorageHomeState extends State<FileStorageHome>
     final connected = _isConnected;
     if (connected && !_wasConnected) {
       _wasConnected = true;
-      _refreshFiles();
+      _refreshAll();
     }
     if (!connected && _wasConnected) {
       _wasConnected = false;
@@ -157,7 +157,18 @@ class _FileStorageHomeState extends State<FileStorageHome>
   {
     setState(() {
       _selectedArea = option;
+      _selectedFolder = null;
     });
+    _persistPathPrefix();
+    _refreshAll();
+  }
+
+  void _changeFolder(final String? folder)
+  {
+    setState(() {
+      _selectedFolder = folder;
+    });
+    _persistPathPrefix();
     _refreshFiles();
   }
 
@@ -173,19 +184,59 @@ class _FileStorageHomeState extends State<FileStorageHome>
   {
     final storage = web.window.localStorage;
     final storedValue = storage.getItem(_pathPrefixStorageKey);
-    if (storedValue == null) return;
-    _pathController.text = storedValue;
+    if (storedValue == null || storedValue.isEmpty) return;
+    _selectedFolder = storedValue;
   }
 
   void _persistPathPrefix()
   {
     final storage = web.window.localStorage;
-    final value = _pathController.text;
-    if (value.isEmpty) {
+    final value = _selectedFolder;
+    if (value == null || value.isEmpty) {
       storage.removeItem(_pathPrefixStorageKey);
       return;
     }
     storage.setItem(_pathPrefixStorageKey, value);
+  }
+
+  Future<void> _refreshAll() async
+  {
+    await _refreshFolders();
+    await _refreshFiles();
+  }
+
+  Future<void> _refreshFolders() async
+  {
+    if (!_isConnected) return;
+    setState(() {
+      _foldersLoading = true;
+    });
+    try {
+      final folders = await _api.listFolders(
+        area: _selectedArea.area,
+        profile: _profileText(),
+      );
+      var selectionCleared = false;
+      setState(() {
+        _folders = folders;
+        if (_selectedFolder != null && !folders.contains(_selectedFolder)) {
+          _selectedFolder = null;
+          selectionCleared = true;
+        }
+      });
+      if (selectionCleared) {
+        _persistPathPrefix();
+      }
+    } catch (error, stackTrace) {
+      debugPrint('Failed to load folders: $error\n$stackTrace');
+      setState(() {
+        _folders = const [];
+      });
+    } finally {
+      setState(() {
+        _foldersLoading = false;
+      });
+    }
   }
 
   Future<void> _refreshFiles() async
@@ -454,8 +505,7 @@ class _FileStorageHomeState extends State<FileStorageHome>
 
   String? _pathText()
   {
-    final text = _pathController.text.trim();
-    return text.isEmpty ? null : text;
+    return _selectedFolder;
   }
 
   _FileEntry? _findByPath(final List<_FileEntry> files, final String path)
@@ -469,16 +519,18 @@ class _FileStorageHomeState extends State<FileStorageHome>
   bool get _isConnected => serviceManager.connectedState.value.connected;
 
   late final TextEditingController _profileController;
-  late final TextEditingController _pathController;
   late final TextEditingController _editorController;
 
   final _api = _FileStorageApi();
   _StorageOption _selectedArea = _storageOptions.first;
   var _recursive = true;
   var _files = <_FileEntry>[];
+  var _folders = <String>[];
+  String? _selectedFolder;
   _FileEntry? _selectedEntry;
   _FilePayload? _payload;
   var _listLoading = false;
+  var _foldersLoading = false;
   var _fileLoading = false;
   var _savingFile = false;
   var _dirty = false;
@@ -526,10 +578,13 @@ class _FileStorageToolbar extends StatelessWidget
   final List<_StorageOption> options;
   final _StorageOption selected;
   final TextEditingController profileController;
-  final TextEditingController pathController;
+  final List<String> folders;
+  final String? selectedFolder;
+  final bool foldersLoading;
   final bool recursive;
   final bool refreshing;
   final ValueChanged<_StorageOption> onAreaChanged;
+  final ValueChanged<String?> onFolderChanged;
   final ValueChanged<bool> onRecursiveChanged;
   final VoidCallback onRefresh;
 
@@ -537,10 +592,13 @@ class _FileStorageToolbar extends StatelessWidget
     required this.options,
     required this.selected,
     required this.profileController,
-    required this.pathController,
+    required this.folders,
+    required this.selectedFolder,
+    required this.foldersLoading,
     required this.recursive,
     required this.refreshing,
     required this.onAreaChanged,
+    required this.onFolderChanged,
     required this.onRecursiveChanged,
     required this.onRefresh,
   });
@@ -578,12 +636,23 @@ class _FileStorageToolbar extends StatelessWidget
           ),
         ),
         SizedBox(
-          width: 200,
-          child: TextField(
-            controller: pathController,
-            decoration: const InputDecoration(
-              labelText: 'Path prefix',
-            ),
+          width: 220,
+          child: DropdownButton<String?>(
+            isExpanded: true,
+            value: folders.contains(selectedFolder) ? selectedFolder : null,
+            hint: Text(foldersLoading ? 'Loading…' : 'All folders'),
+            onChanged: refreshing || foldersLoading ? null : onFolderChanged,
+            items: [
+              const DropdownMenuItem<String?>(
+                value: null,
+                child: Text('All folders'),
+              ),
+              for (final folder in folders)
+                DropdownMenuItem<String?>(
+                  value: folder,
+                  child: Text(folder),
+                ),
+            ],
           ),
         ),
         Row(
@@ -998,6 +1067,22 @@ String _formatFileSize(final int? bytes)
 
 class _FileStorageApi
 {
+  Future<List<String>> listFolders({
+    required final String area,
+    final String? profile,
+  }) async
+  {
+    final response = await serviceManager.callServiceExtensionOnMainIsolate(
+      'ext.file_storage.listFolders',
+      args: _buildArgs(
+        area: area,
+        profile: profile,
+      ),
+    );
+    final data = response.json?['folders'] as List<dynamic>? ?? const [];
+    return data.whereType<String>().toList();
+  }
+
   Future<List<_FileEntry>> listFiles({
     required final String area,
     final String? profile,

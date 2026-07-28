@@ -33,6 +33,7 @@ class _FileStorageDevTools
   void _registerHandlers()
   {
     _register('listFiles', _handleListFiles);
+    _register('listFolders', _handleListFolders);
     _register('readFile', _handleReadFile);
     _register('saveFile', _handleSaveFile);
     _register('deleteFile', _handleDeleteFile);
@@ -84,6 +85,15 @@ class _FileStorageDevTools
     final recursive = parameters['recursive']?.toLowerCase() != 'false';
     final files = await _fetchEntries(request, recursive);
     return { 'files': files };
+  }
+
+  Future<Map<String, dynamic>> _handleListFolders(
+    final Map<String, String> parameters,
+  ) async
+  {
+    final request = _buildRequest(parameters);
+    final folders = await _fetchTopLevelFolders(request);
+    return { 'folders': folders };
   }
 
   Future<Map<String, dynamic>> _handleReadFile(
@@ -191,6 +201,23 @@ class _FileStorageDevTools
       recursive: recursive,
     );
     return entries.map((entry) => entry.toJson()).toList();
+  }
+
+  Future<List<String>> _fetchTopLevelFolders(final _Request request) async
+  {
+    final entries = await _storage!.listFiles(
+      request.area,
+      profile: request.profile,
+      recursive: true,
+    );
+    final folders = <String>{};
+    for (final entry in entries) {
+      final slashIndex = entry.path.indexOf('/');
+      if (slashIndex > 0) {
+        folders.add(entry.path.substring(0, slashIndex));
+      }
+    }
+    return folders.toList()..sort();
   }
 
   Future<Map<String, dynamic>> _readFileContents(final _Request request) async

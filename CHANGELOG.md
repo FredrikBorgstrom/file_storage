@@ -2,7 +2,8 @@
 
 ## 1.1.1
 
-Path prefix in Devtools extension is now remembered inbetween sessions
+- Remember the selected path prefix between DevTools sessions.
+- Discover top-level folders and select them from the DevTools file browser.
 
 ## 1.1.0
 
